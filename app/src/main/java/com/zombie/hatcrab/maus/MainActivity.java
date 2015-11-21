@@ -16,6 +16,9 @@ import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.Button;
+import android.widget.TextView;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -24,25 +27,18 @@ import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
 
-    final double NOISE_THRESHOLD_X = 0.1;
-    final double NOISE_THRESHOLD_Y = 0.1;
-    final double NOISE_THRESHOLD_Z = 0.1;
     final int CALIB_REQUIRED = 100;
 
 
     private SensorManager sensorManager;
-    private Sensor accelerometer;
     private Sensor linearAccelerator;
-    private Sensor gravity;
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothSocket socket;
+    private TextView connectionStatus;
+    private TextView calibrationStatus;
 
     private final UUID SERVER_UUID = UUID.fromString("94f39d29-7d6d-437d-973b-fba39e49d4ee");
 
-    float lastGX = 0;
-    float lastGY = 0;
-    float lastGZ = 0;
-    long lastT = 0;
     float calibTotalX = 0;
     float calibTotalY = 0;
     int calibCount = 0;
@@ -56,33 +52,87 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
-        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        gravity = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
         linearAccelerator = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
-        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-        sensorManager.registerListener(this, gravity, SensorManager.SENSOR_DELAY_NORMAL);
         sensorManager.registerListener(this, linearAccelerator, SensorManager.SENSOR_DELAY_NORMAL);
+
+        connectionStatus = (TextView) findViewById(R.id.connectionStatus);
+        calibrationStatus = (TextView) findViewById(R.id.calibrationStatus);
+        connectionStatus.setText("Not connected.");
+
+        Button connectButton = (Button) findViewById(R.id.connect);
+        Button calibrateButton = (Button) findViewById(R.id.calibrate);
+        connectButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Set<BluetoothDevice> bonded = bluetoothAdapter.getBondedDevices();
+                for (BluetoothDevice device : bonded) {
+                    if (device.getName().equals("mint-0")) {
+                        try {
+                            socket = device.createInsecureRfcommSocketToServiceRecord(SERVER_UUID);
+                            socket.connect();
+                            connectionStatus.setText("Connected.");
+                        } catch (IOException e) {
+                            connectionStatus.setText("Connection failed.");
+                            e.printStackTrace();
+                        }
+                    }
+                }
+            }
+        });
+        calibrateButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                calibCount = 0;
+                calibTotalX = 0;
+                calibTotalY = 0;
+            }
+        });
+        Button lClickButton = (Button) findViewById(R.id.lclick);
+        lClickButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(socket.isConnected()) {
+                    try {
+                        OutputStream os = socket.getOutputStream();
+                        os.write(("lc:\n").getBytes());
+                    } catch (IOException e) {
+                        try {
+                            socket.close();
+                            connectionStatus.setText("Not connected.");
+                        } catch (IOException ex) {
+                            System.err.println("now what");
+                        }
+                    }
+                }
+            }
+        });
+
+        Button rClickButton = (Button) findViewById(R.id.rclick);
+        rClickButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if(socket.isConnected()) {
+                    try {
+                        OutputStream os = socket.getOutputStream();
+                        os.write(("rc:\n").getBytes());
+                    } catch (IOException e) {
+                        try {
+                            socket.close();
+                            connectionStatus.setText("Not connected.");
+                        } catch (IOException ex) {
+                            System.err.println("now what");
+                        }
+                    }
+                }
+            }
+        });
+
 
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if(bluetoothAdapter == null) {
             System.err.println("No bluetooth adapter...");
         } else if(!bluetoothAdapter.isEnabled()) {
             System.err.println("Bluetooth disabled...");
-        } else {
-            Set<BluetoothDevice> bonded = bluetoothAdapter.getBondedDevices();
-            System.out.println("bonded: " + bonded.size());
-            for(BluetoothDevice device : bonded) {
-                if(device.getName().equals("mint-0")){
-                    try {
-                        socket = device.createInsecureRfcommSocketToServiceRecord(SERVER_UUID);
-                        socket.connect();
-                        System.out.println(socket.isConnected());
-                    } catch(IOException e) {
-                        e.printStackTrace();
-                    }
-                }
-                System.out.println(device.getName() + ":" + device.getAddress());
-            }
         }
     }
 
@@ -113,19 +163,16 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         if(event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
             float dx = (event.values[0]);
             float dy = (event.values[1]);
-            /*float dx = (event.values[0] - lastGX);
-            float dy = (event.values[1] - lastGY);
-            float dz = (event.values[2] - lastGZ);*/
-            lastT = System.currentTimeMillis();
             if(calibCount < CALIB_REQUIRED) {
                 calibTotalX += dx;
                 calibTotalY += dy;
                 calibCount++;
-                System.out.println("Calibrating: " + calibCount + "/" + CALIB_REQUIRED);
+                calibrationStatus.setText("Calibrating: " + calibCount + "/" + CALIB_REQUIRED);
                 return;
             } else if (calibCount == CALIB_REQUIRED) {
                 calibX = calibTotalX / CALIB_REQUIRED;
                 calibY = calibTotalY / CALIB_REQUIRED;
+                calibrationStatus.setText("Calibrated!");
             }
 
             dx -= calibX;
@@ -134,25 +181,18 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             if(socket.isConnected()) {
                 try {
                     OutputStream os = socket.getOutputStream();
-                    //if(Math.abs(dx) > NOISE_THRESHOLD_X) {
-                        os.write(("dx:" + dx + "\n").getBytes());
-                    //}
-                    //if(Math.abs(dy) > NOISE_THRESHOLD_Y) {
-                        os.write(("dy:" + dy + "\n").getBytes());
-                    //}
+                    os.write(("dx:" + dx + "\n").getBytes());
+                    os.write(("dy:" + dy + "\n").getBytes());
                 } catch(IOException e) {
                     e.printStackTrace();
                     try {
                         socket.close();
+                        connectionStatus.setText("Not connected.");
                     } catch(IOException ex) {
                         System.err.println("now what");
                     }
                 }
             }
-        } else if (event.sensor.getType() == Sensor.TYPE_GRAVITY) {
-            lastGX = event.values[0];
-            lastGY = event.values[1];
-            lastGZ = event.values[2];
         }
     }
 
@@ -170,6 +210,6 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     @Override
     public void onResume() {
         super.onResume();
-        sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
+        sensorManager.registerListener(this, linearAccelerator, SensorManager.SENSOR_DELAY_NORMAL);
     }
 }

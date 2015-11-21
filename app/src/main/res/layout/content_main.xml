@@ -12,4 +12,64 @@
     tools:context="com.zombie.hatcrab.maus.MainActivity"
     tools:showIn="@layout/activity_main">
 
+    <LinearLayout
+        android:orientation="vertical"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentBottom="true">
+
+        <LinearLayout
+            android:orientation="horizontal"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal">
+
+            <Button
+                android:layout_width="wrap_content"
+                android:layout_height="150dp"
+                android:layout_weight="50"
+                android:text="LEFT CLICK"
+                android:id="@+id/lclick" />
+
+            <Button
+                android:layout_width="wrap_content"
+                android:layout_height="150dp"
+                android:layout_weight="50"
+                android:text="RIGHT CLICK"
+                android:id="@+id/rclick" />
+        </LinearLayout>
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Calibrate"
+            android:id="@+id/calibrate"
+            android:layout_gravity="center_horizontal" />
+
+        <Button
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Connect"
+            android:id="@+id/connect"
+            android:layout_gravity="center_horizontal" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="Medium Text"
+            android:id="@+id/calibrationStatus"
+            android:layout_gravity="center_horizontal" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?android:attr/textAppearanceMedium"
+            android:text="Medium Text"
+            android:id="@+id/connectionStatus"
+            android:layout_gravity="center_horizontal" />
+    </LinearLayout>
 </RelativeLayout>
