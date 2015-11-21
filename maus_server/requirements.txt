@@ -4,3 +4,4 @@ PyBluez==0.22
 PyMsgBox==1.0.3
 PyScreeze==0.1.8
 PyTweening==1.0.3
+python-xlib==0.14
