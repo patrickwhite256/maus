@@ -66,15 +66,14 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             public void onClick(View v) {
                 Set<BluetoothDevice> bonded = bluetoothAdapter.getBondedDevices();
                 for (BluetoothDevice device : bonded) {
-                    if (device.getName().equals("mint-0")) {
-                        try {
-                            socket = device.createInsecureRfcommSocketToServiceRecord(SERVER_UUID);
-                            socket.connect();
-                            connectionStatus.setText("Connected.");
-                        } catch (IOException e) {
-                            connectionStatus.setText("Connection failed.");
-                            e.printStackTrace();
-                        }
+                    try {
+                        socket = device.createInsecureRfcommSocketToServiceRecord(SERVER_UUID);
+                        socket.connect();
+                        connectionStatus.setText("Connected.");
+                        break;
+                    } catch (IOException e) {
+                        connectionStatus.setText("Connection failed.");
+                        e.printStackTrace();
                     }
                 }
             }
@@ -178,7 +177,7 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
             dx -= calibX;
             dy -= calibY;
 
-            if(socket.isConnected()) {
+            if(socket != null && socket.isConnected()) {
                 try {
                     OutputStream os = socket.getOutputStream();
                     os.write(("dx:" + dx + "\n").getBytes());
