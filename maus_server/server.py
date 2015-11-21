@@ -3,8 +3,8 @@
 import bluetooth as bt
 import pyautogui
 
-X_SCALE_FACTOR = 40
-Y_SCALE_FACTOR = 40
+X_SCALE_FACTOR = 10
+Y_SCALE_FACTOR = -10
 
 server_sock = bt.BluetoothSocket(bt.RFCOMM)
 server_sock.bind(("", bt.PORT_ANY))
@@ -27,22 +27,26 @@ client_sock, address = server_sock.accept()
 print("Accepted connection from {0}".format(address))
 
 data = "!"
+x_v = 0
+y_v = 0
 
 while data:
     data = client_sock.recv(1024)
     data_parts = [p for p in str(data).split('\n') if p]
     for part in data_parts:
-        print("Data received:", part)
         k, v = part.split(':')
         if k == 'dx':
-            value = float(v)
-            move_amt = round(Y_SCALE_FACTOR * value)
-            print 'x::{0}'.format(move_amt)
-            pyautogui.moveRel(move_amt, None)
+            x_v += float(v)
+            if x_v > 0.3:
+                print 'x::{0}'.format(x_v)
         if k == 'dy':
-            move_amt = round(Y_SCALE_FACTOR * value)
-            print 'y::{0}'.format(move_amt)
-            pyautogui.moveRel(None, move_amt)
+            y_v += float(v)
+            if y_v > 0.3:
+                print 'y::{0}'.format(y_v)
+        x_v *= 0.7
+        y_v *= 0.7
+        print(x_v, y_v)
+        pyautogui.moveRel(x_v * X_SCALE_FACTOR, y_v * Y_SCALE_FACTOR)
 
 
 client_sock.close()

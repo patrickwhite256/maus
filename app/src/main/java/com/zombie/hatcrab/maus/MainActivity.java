@@ -24,32 +24,30 @@ import java.util.UUID;
 
 public class MainActivity extends AppCompatActivity implements SensorEventListener {
 
-    final double NOISE_THRESHOLD_X = 0.07;
-    final double NOISE_THRESHOLD_Y = 0.07;
-    final double NOISE_THRESHOLD_Z = 0.07;
+    final double NOISE_THRESHOLD_X = 0.1;
+    final double NOISE_THRESHOLD_Y = 0.1;
+    final double NOISE_THRESHOLD_Z = 0.1;
+    final int CALIB_REQUIRED = 100;
+
 
     private SensorManager sensorManager;
     private Sensor accelerometer;
+    private Sensor linearAccelerator;
     private Sensor gravity;
     private BluetoothAdapter bluetoothAdapter;
     private BluetoothSocket socket;
 
     private final UUID SERVER_UUID = UUID.fromString("94f39d29-7d6d-437d-973b-fba39e49d4ee");
 
-    private final BroadcastReceiver btReceiver = new BroadcastReceiver() {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            if(intent.getAction().equals(BluetoothDevice.ACTION_FOUND)) {
-                BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-                System.out.println("Found: " + device.getName() + "; " + device.getAddress());
-            }
-        }
-    };
-
     float lastGX = 0;
     float lastGY = 0;
     float lastGZ = 0;
     long lastT = 0;
+    float calibTotalX = 0;
+    float calibTotalY = 0;
+    int calibCount = 0;
+    float calibX;
+    float calibY;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,8 +58,10 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
         sensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         gravity = sensorManager.getDefaultSensor(Sensor.TYPE_GRAVITY);
+        linearAccelerator = sensorManager.getDefaultSensor(Sensor.TYPE_LINEAR_ACCELERATION);
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
         sensorManager.registerListener(this, gravity, SensorManager.SENSOR_DELAY_NORMAL);
+        sensorManager.registerListener(this, linearAccelerator, SensorManager.SENSOR_DELAY_NORMAL);
 
         bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
         if(bluetoothAdapter == null) {
@@ -110,25 +110,43 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
 
     @Override
     public void onSensorChanged(SensorEvent event) {
-        if(event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-            float dx = (event.values[0] - lastGX);
+        if(event.sensor.getType() == Sensor.TYPE_LINEAR_ACCELERATION) {
+            float dx = (event.values[0]);
+            float dy = (event.values[1]);
+            /*float dx = (event.values[0] - lastGX);
             float dy = (event.values[1] - lastGY);
-            float dz = (event.values[2] - lastGZ);
+            float dz = (event.values[2] - lastGZ);*/
             lastT = System.currentTimeMillis();
+            if(calibCount < CALIB_REQUIRED) {
+                calibTotalX += dx;
+                calibTotalY += dy;
+                calibCount++;
+                System.out.println("Calibrating: " + calibCount + "/" + CALIB_REQUIRED);
+                return;
+            } else if (calibCount == CALIB_REQUIRED) {
+                calibX = calibTotalX / CALIB_REQUIRED;
+                calibY = calibTotalY / CALIB_REQUIRED;
+            }
+
+            dx -= calibX;
+            dy -= calibY;
+
             if(socket.isConnected()) {
                 try {
                     OutputStream os = socket.getOutputStream();
-                    if(Math.abs(dx) > NOISE_THRESHOLD_X) {
+                    //if(Math.abs(dx) > NOISE_THRESHOLD_X) {
                         os.write(("dx:" + dx + "\n").getBytes());
-                    }
-                    if(Math.abs(dy) > NOISE_THRESHOLD_Y) {
+                    //}
+                    //if(Math.abs(dy) > NOISE_THRESHOLD_Y) {
                         os.write(("dy:" + dy + "\n").getBytes());
-                    }
-                    if(Math.abs(dz) > NOISE_THRESHOLD_Z) {
-                        //os.write(("dz" + dz).getBytes());
-                    }
+                    //}
                 } catch(IOException e) {
                     e.printStackTrace();
+                    try {
+                        socket.close();
+                    } catch(IOException ex) {
+                        System.err.println("now what");
+                    }
                 }
             }
         } else if (event.sensor.getType() == Sensor.TYPE_GRAVITY) {
@@ -153,11 +171,5 @@ public class MainActivity extends AppCompatActivity implements SensorEventListen
     public void onResume() {
         super.onResume();
         sensorManager.registerListener(this, accelerometer, SensorManager.SENSOR_DELAY_NORMAL);
-    }
-
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
-        unregisterReceiver(btReceiver);
     }
 }
